@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title> Image Search </title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/5.0.0/normalize.min.css">
+  <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/cropper/2.3.4/cropper.min.css'>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/0.8.1/cropper.min.js'></script>
+  <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+  <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='style.css') }}">
+  <style>
+    .result-container {
+        margin-top: 50px; 
+        margin-right: px;
+    }
+</style>
+</head>
+
+<body>
+  <div class="form-section">
+    <div class="page">
+      <table>
+        <tr>
+          <td>
+            <h1 style="margin-left: 50px; margin-top:-5px;">Image Search</h1>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <!-- input file -->
+            <form id="uploadForm" action="/upload_file" method="POST" enctype="multipart/form-data">
+
+              <input type="file" name="file" accept="image/*" id="file-input" style="margin-left: 50px;" />
+              <input type="hidden" name="image_url" id="image_url" value="" />
+              <button type="button" class="btn upload hide" id="searchBtn" style="margin-left: 50px;">Search</button>
+
+            </form>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <!-- leftbox -->
+            <div class="box-2" style="margin-left: 20px;">
+              <div class="result"></div>
+            </div>
+            <!--rightbox-->
+            <div class="box-2 img-result hide">
+              <!-- result of crop -->
+              <img class="cropped" src="" alt="">
+            </div>
+            <!-- input file -->
+          </td>
+      </table>
+    </div>
+    <h1>Result</h1>
+    <div class="display image">
+      {% if data %}
+      <div class="result-container">
+        <h2>execute time: {{time}} </h2>
+    </div>
+      {% for image, dist in data %}
+      <figure>
+        <img src="{{ url_for('static', filename=image) }}" alt="{{ image }}" style="width: 300px; height: 300px;"
+             onclick="openModal(this.src)">
+        <figcaption>{{ dist }}</figcaption>
+      </figure>
+      {% endfor %}
+      {% endif %}
+    </div>
+
+    <!-- The Modal -->
+    <div id="myModal" class="modal">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <img class="modal-content" id="modalImg">
+    </div>
+  </div>
+
+
+
+
+</body>
+
+<script>
+
+  let result = document.querySelector('.result'),
+    img_result = document.querySelector('.img-result'),
+    search = document.querySelector('.upload'),
+    cropped = document.querySelector('.cropped'),
+    upload = document.querySelector('#file-input')
+
+
+  document.getElementById('searchBtn').addEventListener('click', function (e) {
+    e.preventDefault(); // Ngăn chặn hành vi mặc định của form submission
+
+    // Tiến hành gửi dữ liệu form bằng AJAX
+    sendFormData();
+  });
+
+  function sendFormData() {
+    // Lấy dữ liệu form
+    var formData = new FormData(document.getElementById('uploadForm'));
+
+    // Gửi dữ liệu form bằng AJAX
+    $.ajax({
+      type: 'POST',
+      url: '/upload_file', // Đổi đường dẫn tùy thuộc vào cấu hình của bạn
+      data: formData,
+      contentType: false,
+      processData: false,
+      success: function (response) {
+        // Xử lý kết quả thành công (nếu cần)
+        console.log(response);
+      },
+      error: function (error) {
+        // Xử lý lỗi (nếu cần)
+        console.error(error);
+      }
+    });
+  }
+
+  let cropper; // Define cropper variable outside the event listener
+
+  upload.addEventListener('change', e => {
+    e.preventDefault();
+    if (e.target.files.length) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        if (e.target.result) {
+          let img = document.createElement('img');
+          img.id = 'image';
+          img.src = e.target.result;
+          result.innerHTML = '';
+          result.appendChild(img);
+          search.classList.remove('hide');
+
+          // Initialize cropper here
+          cropper = new Cropper(img);
+
+          // You can also do additional operations with cropper here if needed
+          let imgSrc = cropper.getCroppedCanvas({
+            width: 300 // input value
+          }).toDataURL();
+        }
+      };
+      reader.readAsDataURL(e.target.files[0]);
+      // remove hide class of img
+      cropped.classList.remove('hide');
+      img_result.classList.remove('hide');
+      // show image cropped
+      //cropped.src = imgSrc;
+    }
+  });
+
+
+
+
+  search.addEventListener('click', e => {
+    e.preventDefault();
+
+    let imgSrc = cropper.getCroppedCanvas({
+      width: 300
+    }).toDataURL();
+
+
+    let cropperData = cropper.getData();
+    let x = cropperData.x;
+    let y = cropperData.y;
+    let width = cropperData.width;
+    let height = cropperData.height;
+    let fileInput = document.getElementById('file-input');
+    let fileName = fileInput.files[0].name;
+
+
+    $.ajax({
+      type: "POST",
+      url: "/get_Data",
+      contentType: "application/json;charset=UTF-8",
+      data: JSON.stringify({ x: x, y: y, width: width, height: height, fileName: fileName }),
+      success: function (response) {
+        var $responseHtml = $(response);
+        var myClassContent = $responseHtml.find('.display.image').html();
+        $(".display.image").html(myClassContent);
+      },
+      error: function (error) {
+        console.error(error);
+      }
+    });
+
+  });
+
+  function openModal(imgSrc) {
+    var modal = document.getElementById('myModal');
+    var modalImg = document.getElementById('modalImg');
+
+    modal.style.display = 'block';
+    modalImg.src = imgSrc;
+  }
+
+  function closeModal() {
+    var modal = document.getElementById('myModal');
+    modal.style.display = 'none';
+  }
+</script>
+
+</html>
